@@ -18,9 +18,12 @@ import android.os.Parcelable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.SparseBooleanArray;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.PopupMenu;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
@@ -93,34 +96,24 @@ public class EditorView extends FrameLayout implements CodeCompletionBar.OnHintC
     public static final String EXTRA_READ_ONLY = "readOnly";
     public static final String EXTRA_SAVE_ENABLED = "saveEnabled";
     public static final String EXTRA_RUN_ENABLED = "runEnabled";
-
     @ViewById(R.id.editor)
     CodeEditor mEditor;
-
     @ViewById(R.id.code_completion_bar)
     CodeCompletionBar mCodeCompletionBar;
-
     @ViewById(R.id.input_method_enhance_bar)
     View mInputMethodEnhanceBar;
-
     @ViewById(R.id.symbol_bar)
     CodeCompletionBar mSymbolBar;
-
     @ViewById(R.id.functions)
     ImageView mShowFunctionsButton;
-
     @ViewById(R.id.functions_keyboard)
     FunctionsKeyboardView mFunctionsKeyboard;
-
     @ViewById(R.id.debug_bar)
     DebugBar mDebugBar;
-
     @ViewById(R.id.docs)
     EWebView mDocsWebView;
-
     @ViewById(R.id.drawer_layout)
     DrawerLayout mDrawerLayout;
-
     private String mName;
     private Uri mUri;
     private boolean mReadOnly = false;
@@ -149,11 +142,11 @@ public class EditorView extends FrameLayout implements CodeCompletionBar.OnHintC
             }
         }
     };
-
     private SparseBooleanArray mMenuItemStatus = new SparseBooleanArray();
     private String mRestoredText;
     private NormalToolbarFragment mNormalToolbar = new NormalToolbarFragment_();
     private boolean mDebugging = false;
+    private EditorMenu mEditorMenu;
 
     public EditorView(Context context) {
         super(context);
@@ -236,7 +229,6 @@ public class EditorView extends FrameLayout implements CodeCompletionBar.OnHintC
         }
     }
 
-
     @SuppressLint("CheckResult")
     private Observable<String> loadUri(final Uri uri) {
         mEditor.setProgress(true);
@@ -257,7 +249,6 @@ public class EditorView extends FrameLayout implements CodeCompletionBar.OnHintC
         }
         mEditor.setInitialText(text);
     }
-
 
     private void setMenuItemStatus(int id, boolean enabled) {
         mMenuItemStatus.put(id, enabled);
@@ -296,8 +287,8 @@ public class EditorView extends FrameLayout implements CodeCompletionBar.OnHintC
 
     private void initNormalToolbar() {
         mNormalToolbar.setOnMenuItemClickListener(this);
-        mNormalToolbar.setOnMenuItemLongClickListener(id -> {
-            if (id == R.id.run) {
+        mNormalToolbar.setOnMenuItemLongClickListener(view -> {
+            if (view.getId() == R.id.run) {
                 debug();
                 return true;
             }
@@ -327,7 +318,6 @@ public class EditorView extends FrameLayout implements CodeCompletionBar.OnHintC
         mAutoCompletion.setAutoCompleteCallback(mCodeCompletionBar::setCodeCompletions);
     }
 
-
     private void setUpEditor() {
         mEditor.getCodeEditText().addTextChangedListener(new SimpleTextWatcher(s -> {
             setMenuItemStatus(R.id.save, mEditor.isTextChanged());
@@ -336,6 +326,7 @@ public class EditorView extends FrameLayout implements CodeCompletionBar.OnHintC
         }));
         mEditor.addCursorChangeCallback(this::autoComplete);
         mEditor.getCodeEditText().setTextSize(Pref.getEditorTextSize((int) ViewUtils.pxToSp(getContext(), mEditor.getCodeEditText().getTextSize())));
+        mEditorMenu = new EditorMenu(this);
     }
 
     private void autoComplete(String line, int cursor) {
@@ -378,8 +369,8 @@ public class EditorView extends FrameLayout implements CodeCompletionBar.OnHintC
     }
 
     @Override
-    public void onToolbarMenuItemClick(int id) {
-        switch (id) {
+    public void onToolbarMenuItemClick(View view) {
+        switch (view.getId()) {
             case R.id.run:
                 runAndSaveFileIfNeeded();
                 break;
@@ -404,13 +395,29 @@ public class EditorView extends FrameLayout implements CodeCompletionBar.OnHintC
             case R.id.cancel_search:
                 cancelSearch();
                 break;
-            case R.id.textSizePlus:
-                setTextSizePlus();
+            case R.id.action_log:
+                LogActivityKt.start(getContext());
                 break;
-            case R.id.textSizeMinus:
-                setTextSizeMinus();
+            case R.id.debug:
+                showOptionMenu(view, R.menu.menu_editor_debug);
+                break;
+            case R.id.jump:
+                showOptionMenu(view, R.menu.menu_editor_jump);
+                break;
+            case R.id.edit:
+                showOptionMenu(view, R.menu.menu_editor_edit);
+                break;
+            case R.id.others:
+                showOptionMenu(view, R.menu.menu_editor);
                 break;
         }
+    }
+
+    void showOptionMenu(View view, int menuId) {
+        PopupMenu popupMenu = new PopupMenu(getContext(), view);
+        popupMenu.inflate(menuId);
+        popupMenu.setOnMenuItemClickListener(mEditorMenu::onOptionsItemSelected);
+        popupMenu.show();
     }
 
     @SuppressLint("CheckResult")
@@ -432,7 +439,6 @@ public class EditorView extends FrameLayout implements CodeCompletionBar.OnHintC
         setMenuItemStatus(R.id.run, false);
         return execution;
     }
-
 
     public void undo() {
         mEditor.undo();
@@ -612,7 +618,6 @@ public class EditorView extends FrameLayout implements CodeCompletionBar.OnHintC
         mEditor.replaceAll(keywords, replacement, usingRegex);
     }
 
-
     public void debug() {
         DebugToolbarFragment debugToolbarFragment = DebugToolbarFragment_.builder()
                 .build();
@@ -639,7 +644,7 @@ public class EditorView extends FrameLayout implements CodeCompletionBar.OnHintC
 
     private void showErrorMessage(String msg) {
         Snackbar.make(EditorView.this, getResources().getString(R.string.text_error) + ": " + msg, Snackbar.LENGTH_LONG)
-                .setAction(R.string.text_detail, v -> LogActivityKt.start(getContext()) )
+                .setAction(R.string.text_detail, v -> LogActivityKt.start(getContext()))
                 .show();
     }
 

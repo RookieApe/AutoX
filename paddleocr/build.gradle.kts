@@ -4,18 +4,25 @@ plugins {
 }
 
 android {
-    buildToolsVersion = versions.buildTool
     compileSdk = versions.compile
 
     defaultConfig {
         minSdk = versions.mini
-        targetSdk = versions.target
         testInstrumentationRunner = "android.support.test.runner.AndroidJUnitRunner"
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildTypes {
         named("release") {
             isMinifyEnabled = false
-            setProguardFiles(listOf(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"))
+            setProguardFiles(
+                listOf(
+                    getDefaultProguardFile("proguard-android.txt"),
+                    "proguard-rules.pro"
+                )
+            )
         }
     }
 
@@ -24,16 +31,17 @@ android {
             jniLibs.srcDirs("src/main/jniLibs")
         }
     }
+    namespace = "org.autojs.autoxjs.paddleocr"
 }
 
 dependencies {
-    implementation("com.squareup.okhttp3:okhttp:4.10.0")
-    implementation("androidx.core:core-ktx:1.8.0")
-}
-dependencies {
-    testImplementation( "junit:junit:4.13.2")
-    androidTestImplementation( "androidx.test.ext:junit:1.1.3")
-    androidTestImplementation( "androidx.test.espresso:espresso-core:3.4.0")
+    implementation(libs.okhttp)
+    implementation(libs.core.ktx)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.espresso.core){
+        exclude(group = "com.android.support",module = "support-annotations")
+    }
 }
 repositories {
     mavenCentral()
